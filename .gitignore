@@ -6,6 +6,10 @@ log/
 */install/
 */log/
 
+# MuJoCo Log file
+MUJOCO_LOG.TXT
+*.log
+
 # Python caches
 __pycache__/
 *.py[cod]
