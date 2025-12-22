@@ -1,0 +1,12 @@
+echo '<?xml version="1.0"?>
+<package format="3">
+  <name>my_robot_core</name>
+  <version>0.1.0</version>
+  <description>Pure C++ Dynamics Core</description>
+  <maintainer email="user@todo.todo">User</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>cmake</buildtool_depend>
+  <export>
+    <build_type>cmake</build_type>
+  </export>
+</package>'
