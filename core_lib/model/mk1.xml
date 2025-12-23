@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <robot name="single_leg">
 
-// Fixed base link
+<!-- Fixed base link -->
   <link name="base_link">
     <visual>
       <geometry>
@@ -12,12 +12,12 @@
     </visual>
   </link>
 
-// HAA joint (hip_aa_joint)
+<!-- HAA joint (hip_aa_joint) -->
   <joint name="hip_aa_joint" type="revolute">
     <parent link="base_link"/>  <child link="hip_aa_link"/>  <origin xyz="0 0 -0.05" rpy="0 0 0"/> <axis xyz="1 0 0"/>  <limit lower="-1.57" upper="1.57" effort="100" velocity="10"/>
   </joint>
 
-// Hip link(sphere)
+<!-- Hip link(sphere) -->
   <link name="hip_aa_link">
     <visual>
       <origin xyz="0 0 -0.05" rpy="0 0 0"/> 
@@ -33,12 +33,12 @@
     </inertial>
   </link>
 
-// HFE joint (hip_joint)
+<!-- HFE joint (hip_joint) -->
   <joint name="hip_joint" type="revolute">
     <parent link="hip_aa_link"/>  <child link="thigh_link"/>  <origin xyz="0 0 -0.05" rpy="0 0 0"/> <axis xyz="0 1 0"/>  <limit lower="-1.57" upper="1.57" effort="100" velocity="10"/>
   </joint>
 
-// Thigh link
+<!-- Thigh link -->
   <link name="thigh_link">
     <visual>
       <origin xyz="0 0 -0.2" rpy="0 0 0"/> 
@@ -54,12 +54,12 @@
     </inertial>
   </link>
 
-// KFE joint(knee_joint)
+<!-- KFE joint (knee_joint) -->
   <joint name="knee_joint" type="revolute">
     <parent link="thigh_link"/>  <child link="calf_link"/>  <origin xyz="0 0 -0.4" rpy="0 0 0"/> <axis xyz="0 1 0"/>  <limit lower="-1.57" upper="1.57" effort="100" velocity="10"/>
   </joint>
 
-// calf link
+<!-- calf link -->
   <link name="calf_link">
     <visual>
       <origin xyz="0 0 -0.2" rpy="0 0 0"/> 
