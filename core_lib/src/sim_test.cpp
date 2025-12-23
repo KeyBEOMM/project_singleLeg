@@ -9,7 +9,11 @@ mjData* d = NULL;    // 데이터 (변하는 것: 위치, 속도 등)
 int main(int argc, char** argv) {
     // 1. XML 모델 로드 (경로 주의!)
     // 실행 시 install 폴더 기준으로 경로를 찾습니다.
-    const char* filename = "install/my_robot_core/share/my_robot_core/model/test.xml";
+    // const char* filename = "install/my_robot_core/share/my_robot_core/model/test.xml";
+    // const char* filename = "install/my_robot_core/share/my_robot_core/model/mk1_mjcf.xml";
+
+    const char* filename = "install/my_robot_core/share/my_robot_core/model/mk1_mjcf.xml";
+
     if (argc > 1) filename = argv[1];
 
     char error[1000];
