@@ -8,8 +8,8 @@ class leg_FK {
 
 public:
     // home matrix, Screw Axis, Matrix initialize
-    leg_FK() {};
-    ~leg_FK() {};
+    leg_FK();
+    ~leg_FK();
 
     Eigen::Matrix4d singleLeg_FK(const std::vector<double>& joint_angles);
     void set_Home_Matrix();
@@ -29,5 +29,5 @@ private:
     const double Upper_Link = 0.21;
     const double Lower_Link = 0.19;   
 
-    std::vector<double> joint_angle_vector;
+    std::vector<double> joint_angle_vector = {0.0, 0.0, 0.0};
 };

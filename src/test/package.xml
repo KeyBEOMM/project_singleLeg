@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>test</name>
+  <version>0.0.0</version>
+  <description>test package for Single Leg Kinematics with Local Eigen</description>
+  <maintainer email="kgbkevin@gmail.com">user</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  
+  <!-- test 패키지 빌드 전 core_lib 패키지가 빌드되어야 하므로 depend 설정 -->
+  <depend>core_lib</depend>
+  <!-- test 패키지에서 Eigen3를 직접 사용하지않으므로 depend 명시적으로 설정안해도됨 하지만, 하는게 권장되긴함-->
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

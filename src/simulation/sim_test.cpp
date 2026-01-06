@@ -12,7 +12,7 @@ int main(int argc, char** argv) {
     // const char* filename = "install/my_robot_core/share/my_robot_core/model/test.xml";
     // const char* filename = "install/my_robot_core/share/my_robot_core/model/mk1_mjcf.xml";
 
-    const char* filename = "install/my_robot_core/share/my_robot_core/model/mk1.xml";
+    const char* filename = "install/core_lib/share/core_lib/model/fixed_leg.xml";
 
     if (argc > 1) filename = argv[1];
 

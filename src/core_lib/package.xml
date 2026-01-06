@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>core_lib</name>
+  <version>0.0.0</version>
+  <description>core Library for Single Leg Kinematics with Eigen</description>
+  <maintainer email="kgbkelvin@gmail.com">user</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>Eigen3</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
