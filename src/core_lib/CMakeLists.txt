@@ -1,15 +1,36 @@
-# 1. 시스템 find_package(Eigen3)를 사용하지 않습니다.
+cmake_minimum_required(VERSION 3.10)
+project(core_lib)
 
-# 2. 내부에 저장된 Eigen 경로를 직접 지정합니다.
-# ${CMAKE_CURRENT_SOURCE_DIR}는 현재 core_lib 폴더 위치를 가리킵니다.
-set(LOCAL_EIGEN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party/eigen3)
+# 1. 빌드 환경 설정
+find_package(ament_cmake REQUIRED)
 
-# 3. 라이브러리 빌드 시 이 경로를 포함시킵니다.
-target_include_directories(${PROJECT_NAME} PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<BUILD_INTERFACE:${LOCAL_EIGEN_PATH}>
+# 2. 로컬 Eigen3 경로 설정 (third_party 폴더 내의 경로)
+# 현재 CMakeLists.txt 위치에서 상대 경로로 잡습니다.
+set(EIGEN_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/eigen3)
+
+# 3. 라이브러리 생성
+add_library(leg_fk_lib leg_FK.cpp)
+
+# 4. 헤더 파일 경로 포함 (중요!)
+target_include_directories(leg_fk_lib PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Forward_Kinematics_Algorithm> # leg_FK.h 위치 cmake_current_source_dir는 이 CMakeLists.txt가 있는 src/core_lib 폴더를 가르킴
   $<INSTALL_INTERFACE:include>
 )
 
-# 4. 다른 패키지(simulation 등)에 이 경로를 수출(Export)합니다.
-ament_export_include_directories(include ${LOCAL_EIGEN_PATH})
+# 5. 다른 패키지를 위한 내보내기(Export)
+# 나를 가져다 쓰는 simulation 패키지가 Eigen 경로를 자동으로 알게 해줍니다.
+# ament_export_include_directories(Forward_Kinematics ${EIGEN_INCLUDE_DIR})
+# ament_export_libraries(${PROJECT_NAME})
+ament_export_targets(export_leg_fk_lib HAS_LIBRARY_TARGET)
+ament_export_dependencies(ament_cmake)
+
+
+# 6. 설치 규칙
+install(TARGETS leg_fk_lib
+  EXPORT export_leg_fk_lib
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+ament_package()

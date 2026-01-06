@@ -7,6 +7,8 @@ leg_FK::leg_FK() {
     // Initialize the screw axis list
     set_Screw_Axis_List();
 }
+leg_FK::~leg_FK() {
+}
 
 void leg_FK::set_Home_Matrix() {
     M_home = Eigen::Matrix4d::Identity();
@@ -25,7 +27,7 @@ Eigen::Matrix3d leg_FK::skewSymmetric(const Eigen::Vector3d& omega) {
 Eigen::Matrix4d leg_FK::exp_coordinate_Operator(const Vector6d& S, const double theta) {
     Eigen::Matrix4d Transformation_Mat = Eigen::Matrix4d::Zero();
 
-    Eigen::Vector3d bracket_omega = skewSymmetric(S.head<3>());
+    Eigen::Matrix3d bracket_omega = skewSymmetric(S.head<3>());
     Eigen::Vector3d v = S.tail<3>();
 
     Eigen::Matrix3d R = Eigen::Matrix3d::Identity() + sin(theta) * bracket_omega
@@ -57,6 +59,7 @@ Eigen::Matrix4d leg_FK::singleLeg_FK(const std::vector<double>& joint_angles){
         Eigen::Matrix4d T = exp_coordinate_Operator(S_axis_List[i], joint_angles[i]);
         T_theta = T * T_theta;
     }
+    return T_theta;
 }
 
 void leg_FK::Interface_function() {

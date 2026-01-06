@@ -1,3 +1,6 @@
 [submodule "core_lib/third_party/eigen3"]
 	path = core_lib/third_party/eigen3
 	url = https://gitlab.com/libeigen/eigen.git
+[submodule "eigen"]
+	path = eigen
+	url = https://gitlab.com/libeigen/eigen.git

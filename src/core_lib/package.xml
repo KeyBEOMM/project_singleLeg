@@ -2,7 +2,7 @@
 <package format="3">
   <name>core_lib</name>
   <version>0.0.0</version>
-  <description>Single Leg Kinematics with Local Eigen</description>
+  <description>Core Library for Single Leg Kinematics with Local Eigen</description>
   <maintainer email="kgbkevin@gmail.com">user</maintainer>
   <license>Apache-2.0</license>
 
