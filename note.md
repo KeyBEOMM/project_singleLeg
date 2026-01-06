@@ -47,3 +47,10 @@ CMakeLists파일은 동일하게 build 시 빌드 레시피의 역할을 하여 
 3단계,  Build Targets, "실행 파일이나 라이브러리 정의 (add_executable, add_library)"
 4단계,  Linking,타겟과   라이브러리 연결 (target_link_libraries)
 5단계,  Packaging,     "설치 규칙 정의 및 마무리 (install, ament_package)"
+
+## error note
+"core_lib" provides a separate development package or SDK, be sure it has
+  been installed.
+
+- find_package(core_lib)시 실제 core_lib가 설치된 위치를 못찾는 것
+- 빌드했지만, 터미널에서는 core_lib가 빌드된지 모름 source install/setup.bash로 방금 빌드한 패키지를 인식시키는 것(환경 설정을 다시 로드) 

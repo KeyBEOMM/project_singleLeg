@@ -17,16 +17,20 @@ find_package(core_lib REQUIRED)
 # set 
 
 # 5. 실행 파일 생성
-add_executable(KF_test KF_test.cpp)
+add_executable(KF_test src/KF_test.cpp)
 
-# 5-1 헤더 파일 경로 포함 (필요시)
+# 5-1 헤더 파일 경로 포함 (필요시) 패키지 로컬 헤더가 없으므로 생략
 # target_include_directories
     
 # 6. 라이브러리 물리적 연결 (Linking)
 target_link_libraries(KF_test 
-    core_lib::leg_fk_lib
-    
-    )
+    core_lib::core_lib   
+)
 
-# 7. ament 패키징 마무리
+# 7 install ROS 2는 빌드 결과물을 반드시 install 영역으로 옮겨야 실행 도구가 찾을 수 있다. 개발용이라고 설치를 빼먹으면 안 된다.
+install(TARGETS KF_test
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# 8. ament 패키징 마무리
 ament_package()
