@@ -14,6 +14,7 @@ add_library(leg_fk_lib leg_FK.cpp)
 # 4. 헤더 파일 경로 포함 (중요!)
 target_include_directories(leg_fk_lib PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Forward_Kinematics_Algorithm> # leg_FK.h 위치 cmake_current_source_dir는 이 CMakeLists.txt가 있는 src/core_lib 폴더를 가르킴
+  $<BUILD_INTERFACE:${EIGEN3_INCLUDE_DIR}>
   $<INSTALL_INTERFACE:include>
 )
 
@@ -27,7 +28,7 @@ ament_export_dependencies(ament_cmake)
 
 # 6. 설치 규칙
 install(TARGETS leg_fk_lib
-  EXPORT export_leg_fk_lib
+  EXPORT export_${PROJECT_NAME}
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
   RUNTIME DESTINATION bin

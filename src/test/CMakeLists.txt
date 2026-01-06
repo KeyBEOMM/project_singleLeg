@@ -14,21 +14,19 @@ find_package(ament_cmake REQUIRED)
 find_package(core_lib REQUIRED)
 
 # 4-1 소스파일 경로 설정 (필요시)
-set (SOURCE 
-    src/tset/KF_test.cpp
-    src/core_lib/Forward_Kinematics_Algorithm/leg_FK.cpp
-)
+# set 
 
 # 5. 실행 파일 생성
-add_executable(kf_test ${SOURCE})
+add_executable(KF_test KF_test.cpp)
 
 # 5-1 헤더 파일 경로 포함 (필요시)
-target_include_directories(kf_test PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/core_lib/Forward_Kinematics_Algorithm
-)
+# target_include_directories
     
 # 6. 라이브러리 물리적 연결 (Linking)
-target_link_libraries(kf_test core_lib::core_lib)
+target_link_libraries(KF_test 
+    core_lib::leg_fk_lib
+    
+    )
 
 # 7. ament 패키징 마무리
 ament_package()
