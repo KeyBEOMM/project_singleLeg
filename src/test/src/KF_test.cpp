@@ -1,10 +1,10 @@
 #include <iostream>
-#include "core_lib/leg_FK.h"
+#include "core_lib/kinematics.h"
 
 int main() {
     leg_FK legFK;
 
-    legFK.Interface_function();
+    legFK.FK_solver();
 
     return 0;   
 }

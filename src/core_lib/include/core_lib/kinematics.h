@@ -4,20 +4,24 @@
 
 using Vector6d = Eigen::Matrix<double, 6, 1>;
 
-class leg_FK {
+class Leg {
 
 public:
     // home matrix, Screw Axis, Matrix initialize
-    leg_FK();
-    ~leg_FK();
+    Leg();
+    ~Leg();
 
-    Eigen::Matrix4d singleLeg_FK(const std::vector<double>& joint_angles);
     void set_Home_Matrix();
     void set_Screw_Axis_List();
     Eigen::Matrix3d skewSymmetric(const Eigen::Vector3d& omega);
     Eigen::Matrix4d exp_coordinate_Operator(const Vector6d& S, const double theta);
 
-    void Interface_function();
+    Eigen::Matrix4d spaceframe_PoE(const std::vector<double>& joint_angles);
+    void FK_solver();
+    
+    
+    void IK_solver();
+
     void setJoint_Angle_Vector();
 
 private:
