@@ -2,9 +2,9 @@
 #include "core_lib/kinematics.h"
 
 int main() {
-    leg_FK legFK;
+    Leg leg1;
 
-    legFK.FK_solver();
+    leg1.FK_solver();
 
     return 0;   
 }
