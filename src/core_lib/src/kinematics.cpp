@@ -35,24 +35,36 @@ void Leg::set_Home_Matrix() {
 void Leg::set_Screw_Axis_List() {
     // Define the screw axes for the leg joints
     // Q. is it better to set parameters as variables and assign these values for other functions's result?
-    S_axis.col(0) = Vector6d(1, 0, 0, 0, 0, 0);
-    S_axis.col(1) = Vector6d(0, 1, 0, 0, 0, 0);
-    S_axis.col(2) = Vector6d(0, 1, 0, 0.21, 0, 0);
+    Eigen::Vector3d q1, q2, q3; // points on the axes
+    Eigen::Vector3d w1, w2, w3; // direction of the
+    Eigen::Vector3d v1, v2, v3; // linear velocity components
+
+    q1 = Eigen::Vector3d(0, 0, 0);
+    q2 = Eigen::Vector3d(0, HAA_Offset, 0);
+    q3 = Eigen::Vector3d(0, HAA_Offset, -Upper_Link);
+    w1 = Eigen::Vector3d(1, 0, 0);
+    w2 = Eigen::Vector3d(0, 1, 0);
+    w3 = Eigen::Vector3d(0, 1, 0);
+    v1 = -w1.cross(q1);
+    v2 = -w2.cross(q2);
+    v3 = -w3.cross(q3);
+    S_axis.col(0) = Vector6d(w1(0), w1(1), w1(2), v1(0), v1(1), v1(2));
+    S_axis.col(1) = Vector6d(w2(0), w2(1), w2(2), v2(0), v2(1), v2(2));
+    S_axis.col(2) = Vector6d(w3(0), w3(1), w3(2), v3(0), v3(1), v3(2));
 }
 
 void Leg::set_BodyScrew_Axis_List() {
+    // HOme Configuration (M)상태에서 End-Effector frame 기준으로 본 Screw Axis 
     // Define the screw axes for the leg joints
-    // Q. is it better to set parameters as variables and assign these values for other functions's result?
     Eigen::Matrix4d M_inv = M_home.inverse();
     for (int i = 0; i < 3; i++) {
         B_axis.col(i) = adjointTransform(M_inv, S_axis.col(i));
     }
-    B_axis.col(0) = Vector6d(1, 0, 0, 0, -0.4, 0);
-    B_axis.col(1) = Vector6d(0, 1, 0, 0, 0, 0);
-    B_axis.col(2) = Vector6d(0, 1, 0, 0.21, 0, 0);
+    // std::cout << "Resulting Body Screw Axis List:\n" << B_axis << std::endl;
 }
 
 // Compute the 3x3 skew-symmetric matrix of a 3x1 omega vector for Matrix cross product computation
+// 그냥 계산을 할때는 최적화가 되어있는 cross method가 나음
 Eigen::Matrix3d Leg::skewSymmetric(const Eigen::Vector3d& omega) {
     Eigen::Matrix3d skew;
     skew <<     0, -omega(2),  omega(1),
@@ -62,15 +74,16 @@ Eigen::Matrix3d Leg::skewSymmetric(const Eigen::Vector3d& omega) {
 }
 
 // Adjoint Transformation (twist or srcew axis 변환 함수)
-Eigen::Matrix<double, 6, 1> Leg::adjointTransform(const Eigen::Matrix4d& T, const Vector6d& V) {
+Vector6d Leg::adjointTransform(const Eigen::Matrix4d& T, const Vector6d& V) {
     // Matrix를 만들어 6x6 , 6x1 행렬곱 연산 보다 w, v 따로 계산하는 것이 효율적(메모리)
     Eigen::Matrix3d R = T.block<3,3>(0,0);
     Eigen::Vector3d p = T.block<3,1>(0,3);
-
+    Eigen::Vector3d w = V.head<3>();
+    Eigen::Vector3d v = V.tail<3>();
     Vector6d ret;
 
-    ret.head<3>() = R * V.head<3>();
-    ret.tail<3>() = p.cross(ret.head<3>()) + R * V.tail<3>();
+    ret.head<3>() = R * w;
+    ret.tail<3>() = p.cross(w) + R * v;
     return ret;
 }
 
@@ -81,7 +94,7 @@ Eigen::Matrix4d Leg::exp_coordinate_Operator(const Vector6d& B, const double the
     Eigen::Matrix4d Transformation_Mat = Eigen::Matrix4d::Zero();
     Eigen::Vector3d v = B.tail<3>();
 
-    if (theta < 1e-9) {
+    if (std::abs(theta) < 1e-9) {
         Transformation_Mat = Eigen::Matrix4d::Identity();
         Transformation_Mat.block<3,1>(0,3) = v * theta;
         return Transformation_Mat;
@@ -111,22 +124,52 @@ Eigen::Matrix4d Leg::exp_coordinate_Operator(const Vector6d& B, const double the
 
 // Compute the forward kinematics using PoE formula (space frame) 포워드 키네매틱스 계산 함수
 Eigen::Matrix4d Leg::bodyframe_PoE(const Eigen::Vector3d& joint_angles){
-    T_theta = M_home;
-    for (int i = 0; i < joint_angles.size(); i++) {
+    T_theta = Eigen::Matrix4d::Identity();
+    for (int i = 0; i < 3; i++) {
         // spcae frame을 사용하고 있기에 base frame에서부터 곱해나가는게 직관적으로 맞을듯
         // adjoint Transformation으로도 가능하다는데 이후 고민해봐야할 듯
-        Eigen::Matrix4d T = exp_coordinate_Operator(B_axis.col(i), joint_angles[i]);
-        T_theta = T_theta * T;
+        Eigen::Matrix4d T_exp = exp_coordinate_Operator(B_axis.col(i), joint_angles[i]);
+        T_theta = T_theta * T_exp;
     };
-    return T_theta;
+    return M_home * T_theta;
+}
+
+Eigen::Matrix4d Leg::spaceframe_PoE(const Eigen::Vector3d& joint_angles){
+    T_theta = Eigen::Matrix4d::Identity();
+    for (int i = 0; i < 3; i++) {
+        // spcae frame을 사용하고 있기에 base frame에서부터 곱해나가는게 직관적으로 맞을듯
+        // adjoint Transformation으로도 가능하다는데 이후 고민해봐야할 듯
+        Eigen::Matrix4d T_exp = exp_coordinate_Operator(S_axis.col(i), joint_angles[i]);
+        T_theta = T_theta * T_exp;
+    };
+    return T_theta * M_home;
 }
 
 // Wrapper function to perform FK solving and print the result 인터페이스 함수
 void Leg::FK_solver() {
     setJoint_Angle_Vector();
     
-    Eigen::Matrix4d result = bodyframe_PoE(joint_angles);
+    // Eigen::Matrix4d result = bodyframe_PoE(joint_angles);
+    Eigen::Matrix4d result = spaceframe_PoE(joint_angles);
     std::cout << "Resulting Transformation Matrix:\n" << result << std::endl;
+
+    // 디버깅 함수 
+    // joint_angles << 0.0, 0.7854, -1.5708; 
+    // std::cout << "--- Debug FK Steps ---" << std::endl;
+    // // 1. 초기값 M 확인
+    // Eigen::Matrix4d T = M_home;
+    // std::cout << "Step 0 (Home M):\n" << T << "\n\n";
+    // // 2. 각 관절 적용 후 변화 확인
+    // for (int i = 0; i < 3; i++) {
+    //     // 현재 적용하는 Screw Axis와 각도 출력
+    //     std::cout << "[Joint " << i << "] Angle: " << joint_angles[i] << std::endl;
+    //     std::cout << "B_axis col: " << B_axis.col(i).transpose() << std::endl;
+    //     Eigen::Matrix4d T_exp = exp_coordinate_Operator(B_axis.col(i), joint_angles[i]);     
+    //     // 지수맵 결과 행렬 출력 (여기서 회전/이동이 제대로 생기는지 확인)
+    //     std::cout << "Exp Matrix:\n" << T_exp << "\n";    
+    //     T = T * T_exp; 
+    //     std::cout << "Result after Joint " << i << ":\n" << T << "\n-----------------\n";
+    //}
 }
 
 // -------------------------------Inverse Kinematics Function-----------------------------------

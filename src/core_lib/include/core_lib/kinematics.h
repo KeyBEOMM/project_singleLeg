@@ -30,6 +30,7 @@ public:
     
     // FK solver functions
     Eigen::Matrix4d bodyframe_PoE(const Eigen::Vector3d& joint_angles);
+    Eigen::Matrix4d spaceframe_PoE(const Eigen::Vector3d& joint_angles);
     void FK_solver();
     
     // IK solver functions
