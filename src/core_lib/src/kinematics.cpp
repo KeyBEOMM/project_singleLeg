@@ -3,11 +3,13 @@
 /*
 고민해볼 점
 0. 동적 메모리 할당 최소화 -> Eigen::Matrix4d Transformation_Mat = Eigen::Matrix4d::Zero(); 등 불필요한 할당 제거 + std::vector x
+    (가장 시급한 문제입니다. 로봇 제어 루프(Real-time loop)에서는 **"절대 힙(Heap) 메모리 할당이 일어나서는 안 된다"**는 철칙이 있습니다.)
 1. 링크의 수가 변하면 사용 불가 -> 링크 수에 상관없이 동작하도록 변경 필요
 2. home matrix와 screw axis list가 하드코딩 되어있음 -> config 파일로부터 불러오도록 변경 필요
 3. 로드리게스 formula에서 cos, sin 계산이 중복 -> 미리 계산해두고 재사용하도록 변경 필요
 4. error handling 없음 -> 추후 추가 필요
 5. 추가로 계산 구현 시에 연산 순서가 수식적으로 상관없을 때 어떤 순서로 계산하는 것이 더 효율적인지 고민해볼 것(항상 행렬을 작게 만드는 것을 우선)
+
 */
 
 Leg::Leg() {
@@ -26,7 +28,8 @@ Leg::~Leg() {
 
 // Set the home configuration matrix M
 void Leg::set_Home_Matrix() {
-    M_home = Eigen::Matrix4d::Identity();
+
+    M_home.setIdentity();
     M_home(1, 3) = HAA_Offset;
     M_home(2, 3) = -(Upper_Link + Lower_Link);
 }
@@ -48,9 +51,12 @@ void Leg::set_Screw_Axis_List() {
     v1 = -w1.cross(q1);
     v2 = -w2.cross(q2);
     v3 = -w3.cross(q3);
-    S_axis.col(0) = Vector6d(w1(0), w1(1), w1(2), v1(0), v1(1), v1(2));
-    S_axis.col(1) = Vector6d(w2(0), w2(1), w2(2), v2(0), v2(1), v2(2));
-    S_axis.col(2) = Vector6d(w3(0), w3(1), w3(2), v3(0), v3(1), v3(2));
+    // S_axis.col(0) = Vector6d(w1(0), w1(1), w1(2), v1(0), v1(1), v1(2));
+    // S_axis.col(1) = Vector6d(w2(0), w2(1), w2(2), v2(0), v2(1), v2(2));
+    // S_axis.col(2) = Vector6d(w3(0), w3(1), w3(2), v3(0), v3(1), v3(2));
+    S_axis.col(0) << w1, v1;
+    S_axis.col(1) << w2, v2;
+    S_axis.col(2) << w3, v3;
 }
 
 void Leg::set_BodyScrew_Axis_List() {
@@ -90,14 +96,15 @@ Vector6d Leg::adjointTransform(const Eigen::Matrix4d& T, const Vector6d& V) {
 // Compute transformation matrix using the matrix exponential of a screw axis and joint angle
 // Using Rodrigues' formula for rotation matrix computation 
 // w = 1 or v =1 일 때 나눠서 처리
-Eigen::Matrix4d Leg::exp_coordinate_Operator(const Vector6d& B, const double theta) {
-    Eigen::Matrix4d Transformation_Mat = Eigen::Matrix4d::Zero();
+// 최적화를 위해 T_out 변수 추가하여 재사용
+void Leg::exp_coordinate_Operator(const Vector6d& B, const double theta, Eigen:: Matrix4d& T_out) {
+    T_out.setIdentity();
+
     Eigen::Vector3d v = B.tail<3>();
 
     if (std::abs(theta) < 1e-9) {
-        Transformation_Mat = Eigen::Matrix4d::Identity();
-        Transformation_Mat.block<3,1>(0,3) = v * theta;
-        return Transformation_Mat;
+        T_out.block<3,1>(0,3) = v * theta;
+        return;
     }
     
     Eigen::Vector3d w = B.head<3>();
@@ -106,51 +113,50 @@ Eigen::Matrix4d Leg::exp_coordinate_Operator(const Vector6d& B, const double the
     double sin_theta = sin(theta);
     double cos_theta = cos(theta);
 
-    Eigen::Matrix3d R = Eigen::Matrix3d::Identity() + sin_theta * bracket_omega
+    Eigen::Matrix3d R = T_out.block<3,3>(0,0) + sin_theta * bracket_omega
                         + (1 - cos_theta) * (bracket_omega * bracket_omega);
 
     Eigen::Vector3d G_theta_v = v * theta
                                 + (1 - cos_theta) * (w.cross(v))
                                 + (theta - sin_theta) * (w.cross(w.cross(v)));
 
-    Transformation_Mat.block<3,3>(0,0) = R;
-    Transformation_Mat.block<3,1>(0,3) = G_theta_v;
-    Transformation_Mat(3,3) = 1.0;
+    T_out.block<3,3>(0,0) = R;
+    T_out.block<3,1>(0,3) = G_theta_v;
 
-    return Transformation_Mat;
+    //Transformation_Mat.block<3,3>(0,0) = Eigen::AngleAxisd(theta, w).toRotationMatrix();
+
+    return;
 }
 
 // -------------------------------Forward Kinematics Function-----------------------------------
 
 // Compute the forward kinematics using PoE formula (space frame) 포워드 키네매틱스 계산 함수
 Eigen::Matrix4d Leg::bodyframe_PoE(const Eigen::Vector3d& joint_angles){
-    T_theta = Eigen::Matrix4d::Identity();
+    Eigen::Matrix4d T_total = M_home;
     for (int i = 0; i < 3; i++) {
-        // spcae frame을 사용하고 있기에 base frame에서부터 곱해나가는게 직관적으로 맞을듯
-        // adjoint Transformation으로도 가능하다는데 이후 고민해봐야할 듯
-        Eigen::Matrix4d T_exp = exp_coordinate_Operator(B_axis.col(i), joint_angles[i]);
-        T_theta = T_theta * T_exp;
+        exp_coordinate_Operator(B_axis.col(i), joint_angles[i], T_temp);
+        T_total = T_total * T_temp;
     };
-    return M_home * T_theta;
+    return T_total;
 }
 
 Eigen::Matrix4d Leg::spaceframe_PoE(const Eigen::Vector3d& joint_angles){
-    T_theta = Eigen::Matrix4d::Identity();
-    for (int i = 0; i < 3; i++) {
+    Eigen::Matrix4d T_total = M_home;
+    for (int i = 2; i >= 0; i--) {
         // spcae frame을 사용하고 있기에 base frame에서부터 곱해나가는게 직관적으로 맞을듯
         // adjoint Transformation으로도 가능하다는데 이후 고민해봐야할 듯
-        Eigen::Matrix4d T_exp = exp_coordinate_Operator(S_axis.col(i), joint_angles[i]);
-        T_theta = T_theta * T_exp;
+        exp_coordinate_Operator(S_axis.col(i), joint_angles[i], T_temp);
+        T_total = T_temp * T_total;
     };
-    return T_theta * M_home;
+    return T_total;
 }
 
 // Wrapper function to perform FK solving and print the result 인터페이스 함수
 void Leg::FK_solver() {
     setJoint_Angle_Vector();
     
-    // Eigen::Matrix4d result = bodyframe_PoE(joint_angles);
-    Eigen::Matrix4d result = spaceframe_PoE(joint_angles);
+    Eigen::Matrix4d result = bodyframe_PoE(JOINT_ANG);
+    //Eigen::Matrix4d result = spaceframe_PoE(joint_angles);
     std::cout << "Resulting Transformation Matrix:\n" << result << std::endl;
 
     // 디버깅 함수 
@@ -173,18 +179,126 @@ void Leg::FK_solver() {
 }
 
 // -------------------------------Inverse Kinematics Function-----------------------------------
+// Eigen::Vector3d Leg::bodyframe_NR(const Eigen::Matrix4d& T_d, const Eigen::Vector3d& initial_guess) {
+    
+//     return 
+// }
 
-void Leg::IK_solver() {
-    std::cout << "Inverse Kinematics solver is not yet implemented." << std::endl;
+Eigen::Vector3d Leg::bodyframe_ANL(const Eigen::Matrix4d& T_d) {
+    // workspace 내에 있는지 확인 - 해보니 결국 연산량이 너무 늘어 배보다 배꼽이 더 커지는 격 -> 3 dof 이하는 해석적 해를 구하는 걸로
+    // 특이점 확인
+    // righty, lefty 결정
+    // 해의 개수에 따라 lefty, righty 구분
+    
+    Eigen::Vector3d ret;
+    Eigen::Vector3d position = T_d.block<3,1>(0,3);
+    
+    double x = position[0];
+    double y = position[1];
+    double z = position[2];
+
+    double h = sqrt(y*y + z*z - HAA_Offset*HAA_Offset); // home configuration에서의 yz 평면에서의 높이
+    ret[0] = atan2(y, -z) - atan2(HAA_Offset, h); // HAA angle 계산
+
+    double d_sq = x*x + h*h;
+    double d = sqrt(d_sq);
+
+    double Upper_Link_sq = Upper_Link * Upper_Link;
+    double Lower_Link_sq = Lower_Link * Lower_Link;
+
+    double cos_alpha = (d_sq + Upper_Link_sq - Lower_Link_sq) / (2 * d * Upper_Link);
+    double cos_beta  = (Upper_Link_sq + Lower_Link_sq - d_sq) / (2 * Upper_Link * Lower_Link);
+
+    // 4. 관절각 산출
+    double gamma = atan2(-x, h); // 정면(x)과 높이(h) 사이의 각도
+    double alpha = acos(std::max(-1.0, std::min(1.0, cos_alpha)));
+    double beta  = acos(std::max(-1.0, std::min(1.0, cos_beta)));
+
+    ret[1] = gamma - alpha; // HFE angle 계산
+    ret[2] = pi - beta; // KFE angle 계산
+
+    return ret;
+    // righty
+
+
+    
+
+    // 해가 있는지 확인(singular configuration인지)
+        // 자코비안 행렬 계산 후 특이값 분해하여 최소 특이값 확인 (rank 확인)
+    
+    // tan2 이용하여 해 계산, 코사인 법칙
 }
 
+// void Leg::IK_solver() {
 
+// }
+
+// // --------------------------------error checking/handling funtion-----------------------------------
+
+// bool checkWorkspace(const Eigen::Matrix4d& T_d) {
+//     Eigen::Vector3d position = T_d.block<3,1>(0,3);
+    
+//     double x = position[0];
+//     double y = position[1];
+//     double z = position[2];
+
+//     // 1. yz 평면에서의 거리 (Roll 축 기준 거리)
+//     double d_yz_sq = y*y + z*z;
+//     double d_off_sq = HAA_Offset * HAA_Offset; // D_OFF = 0.04
+
+//     // [중요] 목표점이 힙 오프셋 원 안쪽에 있으면 도달 불가
+//     if (d_yz_sq < d_off_sq) return false;
+
+//     // 2. 평면 투영 거리 계산 (Effective Length D)
+//     // x축(Pitch 전후)과 yz 평면에서 오프셋을 뺀 나머지 거리의 합성
+//     double D_sq = x*x + (d_yz_sq - d_off_sq);
+//     double D = std::sqrt(D_sq);
+
+//     // 3. 물리적 한계 체크 (L1=0.21, L2=0.19)
+//     double L1 = Upper_Link;
+//     double L2 = Lower_LInk;
+    
+//     // 최대 도달 거리 (다리를 폈을 때)
+//     if (D > (L1 + L2)) return false;
+
+//     // 최소 도달 거리 (무릎이 최대치인 -2.705 rad까지 접혔을 때)
+//     // d^2 = L1^2 + L2^2 - 2*L1*L2*cos(pi - |theta_kfe|)
+//     double min_dist = std::sqrt(L1*L1 + L2*L2 - 2*L1*L2*std::cos(pi - joint_limits[2][0]));
+//     if (D < min_dist) return false;
+
+//     return true; 
+// }
+
+bool Leg::checkJointLimits(const Eigen::Vector3d& joint_angles) {
+    for (size_t i = 0; i < joint_angles.size(); i++) {
+        if (joint_angles[i] < JOINT_LIMITS[i][0] || joint_angles[i] > JOINT_LIMITS[i][1]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Leg::checkSingularity(const Eigen::Matrix<double, 6, 3>& J) {
+    // 자코비안 행렬의 최소 특이값이 특정 임계값보다 작은지 확인하여 특이점 여부 판단
+    Eigen::JacobiSVD<Eigen::Matrix<double, 6, 3>> svd(J);
+    double min_singular_value = svd.singularValues().minCoeff();
+    const double singularity_threshold = 1e-6; // 임계값 설정 (조정 필요)
+    return min_singular_value < singularity_threshold;
+}
 
 // --------------------------------테스트 함수-----------------------------------
 
 // Set joint angles from user input 테스트를 위한 입력함수
 void Leg::setJoint_Angle_Vector() {
-    for (size_t i = 0; i < joint_angles.size(); i++) {
-        std::cin >> joint_angles[i];
+    for (size_t i = 0; i < JOINT_ANG.size(); i++) {
+        std::cin >> JOINT_ANG[i];
     }
+}
+
+Eigen::Vector3d Leg::setJoint_Angle_Vector_ret() {
+    Eigen::Vector3d ret;
+    for (size_t i = 0; i < JOINT_ANG.size(); i++) {
+        std::cin >> ret[i];
+    }
+    return ret;
 }
