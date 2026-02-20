@@ -254,6 +254,12 @@ Eigen::Vector3d Leg::bodyframe_ANL(const Eigen::Matrix4d& T_d) {
     double q1_b = gamma + alpha;
     double q2_b = beta - pi; 
 
+    // 특이점 체크
+    if (checkSingularity_H(Eigen::Vector3d(q0, q1_a, q2_a))) {
+        std::cerr << "[IK Warning] Solution A is near a singularity." << std::endl;
+        return JOINT_ANG; // 현재 상태 유지
+    }
+
     // 4. Joint Limit Check & Optimization (Minimum Displacement)
     // 각 해가 관절 제한 범위 내에 있는지 확인
     bool valid_a = (q1_a >= JOINT_LIMITS[1][0] && q1_a <= JOINT_LIMITS[1][1]) &&
@@ -292,7 +298,7 @@ Eigen::Vector3d Leg::bodyframe_ANL(const Eigen::Matrix4d& T_d) {
 
 // }
 
-// // --------------------------------error checking/handling funtion-----------------------------------
+//--------------------------------error checking/handling funtion-----------------------------------
 
 // bool checkWorkspace(const Eigen::Matrix4d& T_d) {
 //     Eigen::Vector3d position = T_d.block<3,1>(0,3);
@@ -337,12 +343,17 @@ bool Leg::checkJointLimits(const Eigen::Vector3d& joint_angles) {
     return true;
 }
 
-bool Leg::checkSingularity(const Eigen::Matrix<double, 6, 3>& J) {
+bool Leg::checkSingularity_J(const Eigen::Matrix<double, 6, 3>& J) {
     // 자코비안 행렬의 최소 특이값이 특정 임계값보다 작은지 확인하여 특이점 여부 판단
     Eigen::JacobiSVD<Eigen::Matrix<double, 6, 3>> svd(J);
     double min_singular_value = svd.singularValues().minCoeff();
     const double singularity_threshold = 1e-6; // 임계값 설정 (조정 필요)
     return min_singular_value < singularity_threshold;
+}
+bool Leg::checkSingularity_H(const Eigen::Vector3d& joint_angles) {
+    // KFE 관절이 0 또는 180도에 가까울 때 발생하는 특이점 체크
+    double err = std::abs(joint_angles[2] - Home_ANL[2]); // KFE 관절 각도
+    return err < singularity_threshold;
 }
 
 // --------------------------------테스트 함수-----------------------------------

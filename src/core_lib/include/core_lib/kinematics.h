@@ -46,7 +46,8 @@ public:
     // error checking/handling functions
     bool checkWorkspace(const Eigen::Matrix4d& T_d);
     bool checkJointLimits(const Eigen::Vector3d& joint_angles);
-    bool checkSingularity(const Eigen::Matrix<double, 6, 3>& J);
+    bool checkSingularity_J(const Eigen::Matrix<double, 6, 3>& J);
+    bool checkSingularity_H(const Eigen::Vector3d& joint_angles);
     bool checkManipulability(const Eigen::Matrix<double, 6, 3>& J);
 
     // getter functions
@@ -60,6 +61,7 @@ private:
     Eigen::Vector3d JOINT_ANG = {0.0, 0.0, 0.0};
 
     Eigen::Vector3d INITIAL_ANL = {0.0, 0.7854, -1.5708};
+    Eigen::Vector3d Home_ANL = {0.0, 0.0, 0.0};
 
     RobotState robot_state;
 
@@ -72,6 +74,8 @@ private:
         {-1.5708, 2.7925},   // HFE joint limits in radians (-90 to 160 degrees)
         {-2.705, 2.705}       // KFE joint limits in radians (-155 to 155 degrees)
     };
+
+    double singularity_threshold = 0.08; // IK 솔버의 수렴 기준으로 사용할 위치 오차 임계값
 
 //-----helper member variables-----//
     const double pi = 3.14159265358979323846;
