@@ -67,6 +67,7 @@ int main() {
         if (is_success) {
             success_count++;
             std::cout << "[Test " << std::setw(2) << i << "] " << GREEN << "PASS" << RESET;
+            std::cout << "[result] " << leg.getJoint_Angle_Vector().transpose() << std::endl;
         } else {
             std::cout << "[Test " << std::setw(2) << i << "] " << RED << "FAIL" << RESET;
         }

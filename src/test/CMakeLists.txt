@@ -18,7 +18,9 @@ find_package(core_lib REQUIRED)
 
 # 5. 실행 파일 생성
 add_executable(KF_test src/KF_test.cpp)
-add_executable(verify_kinematics src/kinematics_verify.cpp)
+add_executable(kinematics_verify src/kinematics_verify.cpp)
+add_executable(Robustness_test src/Robustness_test.cpp)
+
 
 # 5-1 헤더 파일 경로 포함 (필요시) 패키지 로컬 헤더가 없으므로 생략
 # target_include_directories
@@ -27,12 +29,15 @@ add_executable(verify_kinematics src/kinematics_verify.cpp)
 target_link_libraries(KF_test 
     core_lib::core_lib   
 )
-target_link_libraries(verify_kinematics 
+target_link_libraries(kinematics_verify 
+    core_lib::core_lib   
+)
+target_link_libraries(Robustness_test 
     core_lib::core_lib   
 )
 
 # 7 install ROS 2는 빌드 결과물을 반드시 install 영역으로 옮겨야 실행 도구가 찾을 수 있다. 개발용이라고 설치를 빼먹으면 안 된다.
-install(TARGETS KF_test verify_kinematics
+install(TARGETS KF_test kinematics_verify Robustness_test
   DESTINATION lib/${PROJECT_NAME}
 )
 

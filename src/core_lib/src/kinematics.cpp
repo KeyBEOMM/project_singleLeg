@@ -184,49 +184,108 @@ void Leg::FK_solver() {
 //     return 
 // }
 
+
 Eigen::Vector3d Leg::bodyframe_ANL(const Eigen::Matrix4d& T_d) {
-    // workspace 내에 있는지 확인 - 해보니 결국 연산량이 너무 늘어 배보다 배꼽이 더 커지는 격 -> 3 dof 이하는 해석적 해를 구하는 걸로
-    // 특이점 확인
-    // righty, lefty 결정
-    // 해의 개수에 따라 lefty, righty 구분
-    
-    Eigen::Vector3d ret;
+    // 1. Workspace Validity Check & Early Exit
+    // 목표 위치 추출 (Target Position)
     Eigen::Vector3d position = T_d.block<3,1>(0,3);
-    
     double x = position[0];
     double y = position[1];
     double z = position[2];
 
-    double h = sqrt(y*y + z*z - HAA_Offset*HAA_Offset); // home configuration에서의 yz 평면에서의 높이
-    ret[0] = atan2(y, -z) - atan2(HAA_Offset, h); // HAA angle 계산
+    // YZ 평면 투영 거리 (HAA 관절 회전 평면까지의 거리 계산)
+    double yz_dist_sq = y*y + z*z;
+    double yz_dist = std::sqrt(yz_dist_sq);
 
-    double d_sq = x*x + h*h;
-    double d = sqrt(d_sq);
+    // [Singularity Check 1] 목표점이 HAA 오프셋 원 안쪽에 있으면 도달 불가 (물리적 한계)
+    if (yz_dist < HAA_Offset) {
+        std::cerr << "[IK Error] Target inside HAA offset deadzone." << std::endl;
+        return JOINT_ANG; // 현재 상태 유지
+    }
 
-    double Upper_Link_sq = Upper_Link * Upper_Link;
-    double Lower_Link_sq = Lower_Link * Lower_Link;
+    // 다리 평면상에서의 높이 (h) 및 힙(HFE)에서 목표점까지의 거리 (r)
+    double h = std::sqrt(yz_dist_sq - HAA_Offset*HAA_Offset); 
+    double r_sq = x*x + h*h;
+    double r = std::sqrt(r_sq);
 
-    double cos_alpha = (d_sq + Upper_Link_sq - Lower_Link_sq) / (2 * d * Upper_Link);
-    double cos_beta  = (Upper_Link_sq + Lower_Link_sq - d_sq) / (2 * Upper_Link * Lower_Link);
+    // [Workspace Check] 최대/최소 도달 거리 확인
+    double max_reach = Upper_Link + Lower_Link;
+    double min_reach = std::abs(Upper_Link - Lower_Link); // 다리가 완전히 접혔을 때의 최소 거리
 
-    // 4. 관절각 산출
-    double gamma = atan2(-x, h); // 정면(x)과 높이(h) 사이의 각도
-    double alpha = acos(std::max(-1.0, std::min(1.0, cos_alpha)));
-    double beta  = acos(std::max(-1.0, std::min(1.0, cos_beta)));
+    if (r > max_reach) {
+        std::cerr << "[IK Error] Target out of reach (too far)." << std::endl;
+        return JOINT_ANG;
+    }
+    if (r < min_reach) {
+        std::cerr << "[IK Error] Target too close (self-collision risk)." << std::endl;
+        return JOINT_ANG;
+    }
 
-    ret[1] = gamma - alpha; // HFE angle 계산
-    ret[2] = pi - beta; // KFE angle 계산
+    // 2. Analytical Solution Calculation
+    // q0 (HAA): 기하학적으로 결정 (Righty/Lefty configuration에 따라 부호가 바뀔 수 있으나, 여기선 표준 설정 사용)
+    double q0 = atan2(y, -z) - atan2(HAA_Offset, h);
 
-    return ret;
-    // righty
-
-
+    // pre-check range of q0
+    bool valid_0 = (q0 >= JOINT_LIMITS[0][0] && q0 <= JOINT_LIMITS[0][1]);
     
+    if (!valid_0) {
+        std::cerr << "[IK Error] HAA angle solution violates joint limits." << std::endl;
+        return JOINT_ANG; // 현재 상태 유지
+    }
 
-    // 해가 있는지 확인(singular configuration인지)
-        // 자코비안 행렬 계산 후 특이값 분해하여 최소 특이값 확인 (rank 확인)
+    // Law of Cosines (제2 코사인 법칙)
+    double cos_alpha = (r_sq + Upper_Link*Upper_Link - Lower_Link*Lower_Link) / (2 * r * Upper_Link);
+    double cos_beta  = (Upper_Link*Upper_Link + Lower_Link*Lower_Link - r_sq) / (2 * Upper_Link * Lower_Link);
+
+    // 수치 오차로 인한 범위 초과 방지 (Clamp)
+    cos_alpha = std::max(-1.0, std::min(1.0, cos_alpha));
+    cos_beta  = std::max(-1.0, std::min(1.0, cos_beta));
+
+    double alpha = acos(cos_alpha); // HFE에서의 내부 각도
+    double beta  = acos(cos_beta);  // KFE에서의 내부 각도 (무릎 각도)
+    double gamma = atan2(-x, h);    // 목표 벡터의 각도
+
+    // 3. Select Solution (Two possibilities for Knee: Forward vs Backward)
+    // Solution A: Knee Forward (Standard, ' > ' shape) -> 무릎이 양의 방향으로 굽혀짐 (설정에 따라 다름)
+    double q1_a = gamma - alpha;
+    double q2_a = pi - beta; 
+
+    // Solution B: Knee Backward (Flipped, ' < ' shape) -> 무릎이 음의 방향으로 굽혀짐
+    double q1_b = gamma + alpha;
+    double q2_b = beta - pi; 
+
+    // 4. Joint Limit Check & Optimization (Minimum Displacement)
+    // 각 해가 관절 제한 범위 내에 있는지 확인
+    bool valid_a = (q1_a >= JOINT_LIMITS[1][0] && q1_a <= JOINT_LIMITS[1][1]) &&
+                   (q2_a >= JOINT_LIMITS[2][0] && q2_a <= JOINT_LIMITS[2][1]);
     
-    // tan2 이용하여 해 계산, 코사인 법칙
+    bool valid_b = (q1_b >= JOINT_LIMITS[1][0] && q1_b <= JOINT_LIMITS[1][1]) &&
+                   (q2_b >= JOINT_LIMITS[2][0] && q2_b <= JOINT_LIMITS[2][1]);
+
+    Eigen::Vector3d final_sol;
+
+    // 이전 상태(JOINT_ANG)와 가장 가까운 해를 선택 (Smooth Motion)
+    double dist_a = std::pow(JOINT_ANG[1] - q1_a, 2) + std::pow(JOINT_ANG[2] - q2_a, 2);
+    double dist_b = std::pow(JOINT_ANG[1] - q1_b, 2) + std::pow(JOINT_ANG[2] - q2_b, 2);
+
+    if (valid_a && valid_b) {
+        // 둘 다 가능하면 움직임이 적은 쪽 선택
+        if (dist_a <= dist_b) {
+            final_sol = Eigen::Vector3d(q0, q1_a, q2_a);
+        } else {
+            final_sol = Eigen::Vector3d(q0, q1_b, q2_b);
+        }
+    } else if (valid_a) {
+        final_sol = Eigen::Vector3d(q0, q1_a, q2_a);
+    } else if (valid_b) {
+        final_sol = Eigen::Vector3d(q0, q1_b, q2_b);
+    } else {
+        std::cerr << "[IK Error] Solutions exist but violate joint limits." << std::endl;
+        return JOINT_ANG; // 모든 해가 제한 범위를 벗어남
+    }
+    JOINT_ANG = final_sol; // 상태 업데이트
+
+    return final_sol;
 }
 
 // void Leg::IK_solver() {

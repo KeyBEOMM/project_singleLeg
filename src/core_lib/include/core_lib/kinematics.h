@@ -49,6 +49,9 @@ public:
     bool checkSingularity(const Eigen::Matrix<double, 6, 3>& J);
     bool checkManipulability(const Eigen::Matrix<double, 6, 3>& J);
 
+    // getter functions
+    Eigen::Vector3d getJoint_Angle_Vector() const { return JOINT_ANG; }
+
 private:
     Eigen::Matrix4d M_home;
     Eigen::Matrix<double, 6, 3> B_axis;
